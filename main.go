@@ -141,8 +141,8 @@ func (d *Download) GetNewRequest(method string) (*http.Request, error) {
 func main() {
 	startTime := time.Now()
 	d := Download{
-		url:          "https://github.com/dappuniversity/eth-todo-list/archive/refs/heads/master.zip",
-		targetPath:   "master.zip",
+		url:          "https://github.com/oghene-ella/Pizza-LandingPage/archive/refs/heads/master.zip",
+		targetPath:   "ellah.zip",
 		totalSection: 10,
 	}
 
