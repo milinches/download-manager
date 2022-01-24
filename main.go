@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -42,7 +43,7 @@ func (d *Download) Do() error {
 	sections := make([][2]int, d.totalSection)
 	eachSize := size / d.totalSection
 	fmt.Printf("Each Size is %v bytes\n", eachSize)
-	
+
 	for i := range sections {
 		if i == 0 {
 			sections[i][0] = 0
@@ -58,17 +59,23 @@ func (d *Download) Do() error {
 	}
 	fmt.Println(sections)
 
+	var wg sync.WaitGroup
 	for i, s := range sections {
-		err = d.DownloadSession(i, s)
-		if err != nil {
-			return err
-		}
+		wg.Add(1)
+		go func(i int, s [2]int) {
+			err = d.DownloadSession(i, s)
+			if err != nil {
+				panic(err)
+			}
+			wg.Done()
+		}(i, s)
 	}
+	wg.Wait()
 
-	return nil
+	return d.MergeFiles(sections)
 }
 
-func (d *Download) DownloadSession(i int, c[2]int) error {
+func (d *Download) DownloadSession(i int, c [2]int) error {
 	r, err := d.GetNewRequest("GET")
 	if err != nil {
 		return err
@@ -96,6 +103,31 @@ func (d *Download) DownloadSession(i int, c[2]int) error {
 	return nil
 }
 
+func (d *Download) MergeFiles(sections [][2]int) error {
+	f, err := os.OpenFile(d.targetPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	for i := range sections {
+		tmpFileName := fmt.Sprintf("section-%v.tmp", i)
+		b, err := ioutil.ReadFile(tmpFileName)
+		if err != nil {
+			return err
+		}
+		n, err := f.Write(b)
+		if err != nil {
+			return err
+		}
+		err = os.Remove(tmpFileName)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%v bytes merged\n", n)
+	}
+	return nil
+}
+
 func (d *Download) GetNewRequest(method string) (*http.Request, error) {
 	req, err := http.NewRequest(method, d.url, nil)
 	if err != nil {
@@ -109,8 +141,8 @@ func (d *Download) GetNewRequest(method string) (*http.Request, error) {
 func main() {
 	startTime := time.Now()
 	d := Download{
-		url: "https://github.com/dappuniversity/eth-todo-list/archive/refs/heads/master.zip",
-		targetPath: "master.zip",
+		url:          "https://github.com/dappuniversity/eth-todo-list/archive/refs/heads/master.zip",
+		targetPath:   "master.zip",
 		totalSection: 10,
 	}
 
