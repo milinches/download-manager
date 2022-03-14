@@ -1,11 +1,12 @@
 package download
 
 import (
+	"fmt"
 	"log"
 	"time"
 )
 
-func Download(url, targetPath string, totalSection int) {
+func Download(url, targetPath string, totalSection int) (string, error) {
 	startTime := time.Now()
 	d := DownloadModel{
 		url:          url,
@@ -17,5 +18,7 @@ func Download(url, targetPath string, totalSection int) {
 		log.Printf("An error occured while downloading file: %s\n", err.Error())
 	}
 
-	log.Printf("Download Completed in %v seconds\n", time.Now().Sub(startTime).Seconds())
+	output := fmt.Sprintf("Download Completed in %v seconds\n", time.Now().Sub(startTime).Seconds())
+
+	return output, nil
 }
