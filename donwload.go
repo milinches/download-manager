@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// Donwload - Helps you download the torrent file.
 func Download(url, targetPath string, totalSection int) (string, error) {
 	startTime := time.Now()
 	d := DownloadModel{
