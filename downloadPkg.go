@@ -1,4 +1,4 @@
-package main
+package download
 
 import (
 	"errors"
@@ -9,18 +9,17 @@ import (
 	"os"
 	"strconv"
 	"sync"
-	"time"
 )
 
-type Download struct {
+type DownloadModel struct {
 	url          string
 	targetPath   string
 	totalSection int
 }
 
-func (d *Download) Do() error {
-	fmt.Println("Making Connection...")
-	req, err := d.GetNewRequest("HEAD")
+func (d *DownloadModel) do() error {
+	log.Println("Making Connection...")
+	req, err := d.getNewRequest("HEAD")
 	if err != nil {
 		return err
 	}
@@ -29,7 +28,7 @@ func (d *Download) Do() error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Got: %v\n", resp.StatusCode)
+	log.Printf("Got: %v\n", resp.StatusCode)
 
 	if resp.StatusCode > 299 {
 		return errors.New(fmt.Sprintf("Can't process, response is %v\n", resp.StatusCode))
@@ -37,12 +36,12 @@ func (d *Download) Do() error {
 
 	size, err := strconv.Atoi(resp.Header.Get("Content-Length"))
 	if err != nil {
-		fmt.Printf("Size is %v bytes\n", size)
+		log.Printf("Size is %v bytes\n", size)
 	}
 
 	sections := make([][2]int, d.totalSection)
 	eachSize := size / d.totalSection
-	fmt.Printf("Each Size is %v bytes\n", eachSize)
+	log.Printf("Each Size is %v bytes\n", eachSize)
 
 	for i := range sections {
 		if i == 0 {
@@ -57,13 +56,13 @@ func (d *Download) Do() error {
 			sections[i][1] = size - 1
 		}
 	}
-	fmt.Println(sections)
+	log.Println(sections)
 
 	var wg sync.WaitGroup
 	for i, s := range sections {
 		wg.Add(1)
 		go func(i int, s [2]int) {
-			err = d.DownloadSession(i, s)
+			err = d.downloadSession(i, s)
 			if err != nil {
 				panic(err)
 			}
@@ -72,11 +71,11 @@ func (d *Download) Do() error {
 	}
 	wg.Wait()
 
-	return d.MergeFiles(sections)
+	return d.mergeFiles(sections)
 }
 
-func (d *Download) DownloadSession(i int, c [2]int) error {
-	r, err := d.GetNewRequest("GET")
+func (d *DownloadModel) downloadSession(i int, c [2]int) error {
+	r, err := d.getNewRequest("GET")
 	if err != nil {
 		return err
 	}
@@ -90,7 +89,7 @@ func (d *Download) DownloadSession(i int, c [2]int) error {
 		return errors.New(fmt.Sprintf("Can't process, response is %v", resp.StatusCode))
 	}
 
-	fmt.Printf("Downloaded %v bytes for section %v\n", resp.Header.Get("Content-Length"), i)
+	log.Printf("Downloaded %v bytes for section %v\n", resp.Header.Get("Content-Length"), i)
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
@@ -103,7 +102,7 @@ func (d *Download) DownloadSession(i int, c [2]int) error {
 	return nil
 }
 
-func (d *Download) MergeFiles(sections [][2]int) error {
+func (d *DownloadModel) mergeFiles(sections [][2]int) error {
 	f, err := os.OpenFile(d.targetPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
 	if err != nil {
 		return err
@@ -123,12 +122,12 @@ func (d *Download) MergeFiles(sections [][2]int) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%v bytes merged\n", n)
+		log.Printf("%v bytes merged\n", n)
 	}
 	return nil
 }
 
-func (d *Download) GetNewRequest(method string) (*http.Request, error) {
+func (d *DownloadModel) getNewRequest(method string) (*http.Request, error) {
 	req, err := http.NewRequest(method, d.url, nil)
 	if err != nil {
 		return nil, err
@@ -136,19 +135,4 @@ func (d *Download) GetNewRequest(method string) (*http.Request, error) {
 
 	req.Header.Set("User-Agent", "Download Manager")
 	return req, nil
-}
-
-func main() {
-	startTime := time.Now()
-	d := Download{
-		url:          "https://github.com/oghene-ella/Pizza-LandingPage/archive/refs/heads/master.zip",
-		targetPath:   "ellah.zip",
-		totalSection: 10,
-	}
-
-	if err := d.Do(); err != nil {
-		log.Printf("An error occured while downloading file: %s\n", err.Error())
-	}
-
-	fmt.Printf("Download Completed in %v seconds\n", time.Now().Sub(startTime).Seconds())
 }
